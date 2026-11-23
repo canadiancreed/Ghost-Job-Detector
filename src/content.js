@@ -61,6 +61,7 @@
       history,
       flags: Store.employerFlags(reports, L.company),
       report: reports[`${L.platform}:${L.id}`] || null,
+      weights: settings.weights || null, // your changes to the scoring values, if any
     };
   }
 
@@ -384,13 +385,15 @@
   api.storage.onChanged.addListener(async (changes, area) => {
     if (area !== "local" || retired()) return;
     if (changes.settings) {
+      const oldWeights = JSON.stringify(settings.weights || {});
       settings = Object.assign({}, Store.DEFAULT_SETTINGS, changes.settings.newValue || {});
       if (current) {
-        // Redraw with the new settings; the score itself stays the same.
+        // Redraw with the new settings. The score changes only if you changed the scoring values.
         if (current.host) current.host.remove();
         current.host = null;
       }
       lastToolbar = null;
+      if (current && JSON.stringify(settings.weights || {}) !== oldWeights) await rescoreCurrent();
       schedule(50);
     } else if (changes.reports && current) {
       rescoreCurrent();

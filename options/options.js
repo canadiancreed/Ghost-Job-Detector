@@ -9,7 +9,147 @@ async function loadSettings() {
   const s = await Store.getSettings();
   for (const k of BOOLS) $(k).checked = !!s[k];
   $("cardPlacement").value = s.cardPlacement;
+  showWeights(s.weights);
 }
+
+// ---------------------------------------------------------------- scoring values
+const Scoring = globalThis.GJScoring;
+const inputs = {}; // key -> { param, input, row }
+
+function fmtNum(v) {
+  return String(Math.round(v * 10) / 10);
+}
+
+function buildParams() {
+  const groups = new Map();
+  for (const p of Scoring.PARAMS) {
+    if (!groups.has(p.group)) groups.set(p.group, []);
+    groups.get(p.group).push(p);
+  }
+  const root = $("params");
+  for (const [name, params] of groups) {
+    const det = document.createElement("details");
+    det.className = "group";
+    const sum = document.createElement("summary");
+    sum.append(name);
+    const count = document.createElement("span");
+    count.className = "count";
+    sum.append(count);
+    det.append(sum);
+    for (const p of params) {
+      const row = document.createElement("div");
+      row.className = "param";
+      const id = "w-" + p.key;
+      const label = document.createElement("label");
+      label.className = "name";
+      label.htmlFor = id;
+      label.style.display = "block";
+      label.append(p.label);
+      const def = document.createElement("span");
+      def.className = "def";
+      def.textContent = `Default ${fmtNum(p.def)}`;
+      label.append(def);
+      const input = document.createElement("input");
+      input.type = "number";
+      input.id = id;
+      input.min = p.min;
+      input.max = p.max;
+      input.step = p.step;
+      input.required = true;
+      const unit = document.createElement("span");
+      unit.className = "unit";
+      unit.textContent = p.unit;
+      const reset = document.createElement("button");
+      reset.className = "reset";
+      reset.type = "button";
+      reset.textContent = "Reset";
+      reset.title = `Back to ${fmtNum(p.def)}`;
+      reset.addEventListener("click", () => {
+        input.value = fmtNum(p.def);
+        saveWeights();
+      });
+      input.addEventListener("change", saveWeights);
+      row.append(label, input, unit, reset);
+      det.append(row);
+      inputs[p.key] = { param: p, input, row, group: det, count };
+    }
+    root.append(det);
+  }
+}
+
+function showWeights(saved) {
+  const w = Scoring.weightsFrom(saved);
+  for (const { param, input } of Object.values(inputs)) {
+    if (document.activeElement !== input) input.value = fmtNum(w[param.key]);
+  }
+  markChanged();
+  showBands(saved);
+}
+
+function markChanged() {
+  const perGroup = new Map();
+  let total = 0;
+  for (const { param, input, row, count } of Object.values(inputs)) {
+    const changed = input.value !== "" && Number(input.value) !== param.def;
+    row.classList.toggle("changed", changed);
+    if (!perGroup.has(count)) perGroup.set(count, 0);
+    if (changed) {
+      perGroup.set(count, perGroup.get(count) + 1);
+      total++;
+    }
+  }
+  for (const [count, n] of perGroup) count.textContent = n ? `${n} changed` : "";
+  $("changedCount").textContent = total
+    ? `${total} value${total === 1 ? "" : "s"} changed from the defaults.`
+    : "All values are at their defaults.";
+  $("resetWeights").disabled = total === 0;
+}
+
+function showBands(saved) {
+  const ul = $("bands");
+  ul.replaceChildren();
+  Scoring.bandsFor(saved).forEach((b, i, arr) => {
+    const li = document.createElement("li");
+    const s = document.createElement("b");
+    s.style.color = b.color;
+    s.textContent = `${i === 0 ? 0 : arr[i - 1].max + 1}–${b.max}`;
+    li.append(s, " " + b.label);
+    ul.append(li);
+  });
+}
+
+let weightsTimer;
+async function saveWeights() {
+  // Keep only valid values that differ from the defaults; weightsFrom() clamps the rest.
+  const raw = {};
+  for (const { param, input } of Object.values(inputs)) {
+    if (input.value === "") continue;
+    const v = Number(input.value);
+    if (Number.isFinite(v) && v !== param.def) raw[param.key] = v;
+  }
+  const w = Scoring.weightsFrom(raw);
+  const weights = {};
+  for (const p of Scoring.PARAMS) if (w[p.key] !== p.def) weights[p.key] = w[p.key];
+  await Store.setSettings({ weights });
+  // Show what was actually saved (out-of-range values clamped, bands kept in order).
+  for (const { param, input } of Object.values(inputs)) {
+    const shown = fmtNum(w[param.key]);
+    if (input.value !== shown) input.value = shown;
+  }
+  markChanged();
+  showBands(weights);
+  $("weightsSaved").textContent = "Saved. Open listings are re-scored.";
+  clearTimeout(weightsTimer);
+  weightsTimer = setTimeout(() => ($("weightsSaved").textContent = ""), 2000);
+}
+
+$("resetWeights").addEventListener("click", async () => {
+  if (!confirm("Put every scoring value back to its default?")) return;
+  for (const { param, input } of Object.values(inputs)) input.value = fmtNum(param.def);
+  await saveWeights();
+});
+
+buildParams();
 
 let savedTimer;
 async function save(patch) {

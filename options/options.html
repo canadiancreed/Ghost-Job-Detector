@@ -43,14 +43,20 @@
     </section>
 
     <section>
+      <h2>Scoring</h2>
+      <p class="muted">Change how much each signal counts and where the cut-offs are. Points above zero raise the risk score; points below zero lower it. Set a signal to 0 to ignore it. Changes apply to the listing that's open now and to every listing after it.</p>
+      <p id="changedCount" class="muted"></p>
+      <div id="params"></div>
+      <div class="row">
+        <button id="resetWeights">Reset all to defaults</button>
+      </div>
+      <p id="weightsSaved" class="muted" aria-live="polite"></p>
+    </section>
+
+    <section>
       <h2>How scoring works</h2>
-      <p>Each listing starts at 20 and moves up or down based on signals the page shows. Information the page doesn't show is listed as unknown and never counted against the listing.</p>
-      <ul class="bands">
-        <li><b class="b1">0–34</b> Worth Applying</li>
-        <li><b class="b2">35–54</b> Proceed with Caution</li>
-        <li><b class="b3">55–74</b> Likely a Waste of Time</li>
-        <li><b class="b4">75–100</b> Skip This Job</li>
-      </ul>
+      <p>Each listing starts at a base score (20 by default) and moves up or down based on signals the page shows. Information the page doesn't show is listed as unknown and never counted against the listing. All the values below can be changed under Scoring.</p>
+      <ul class="bands" id="bands"></ul>
       <p>Signals: posting age (with minimum scores at 60, 90 and 120 days), reposts and recycled listings you've seen before, applicant volume and Easy Apply on old listings, salary disclosure, staffing agencies and job boards, description length, vague wording and leftover template placeholders, junior titles with senior requirements, hiring contacts, employer responsiveness and activity, "actively reviewing" indicators, off-platform apply, company ratings (Indeed), and remote vs. on-site contradictions.</p>
       <p>Your history with an employer (the average score of its other listings you've opened) and your own flags and outcome reports are blended in. Thin history counts for little, and history raises a score more easily than it lowers it. High-turnover roles such as baristas, warehouse staff and nursing assistants are scored more leniently on age and reposts.</p>
       <p class="muted">Scores are estimates, not verdicts.</p>

@@ -13,14 +13,114 @@
 (function () {
   "use strict";
 
-  const BASE = 20;
+  // Every adjustable value, with its default. The Settings page builds its Scoring
+  // section from this list; saved changes arrive as ctx.weights ({ key: value }, only
+  // the changed ones). Points: positive raises the risk score, negative lowers it.
+  const P = (group, key, label, def, unit, min, max, step) => ({ group, key, label, def, unit, min, max, step: step || 1 });
+  const PTS = [-100, 100];
+  const PARAMS = [
+    P("General", "base", "Starting score for every listing", 20, "pts", 0, 100),
+    P("General", "turnoverPct", "High-turnover roles: age and repost points count at", 50, "%", 0, 100),
 
-  const BANDS = [
-    { max: 34, key: "apply", label: "Worth Applying", color: "#1f9d55" },
-    { max: 54, key: "caution", label: "Proceed with Caution", color: "#d69e2e" },
-    { max: 74, key: "waste", label: "Likely a Waste of Time", color: "#dd6b20" },
-    { max: 100, key: "skip", label: "Skip This Job", color: "#c53030" },
+    P("Score bands", "bandCaution", "Proceed with Caution starts at", 35, "score", 1, 98),
+    P("Score bands", "bandWaste", "Likely a Waste of Time starts at", 55, "score", 2, 99),
+    P("Score bands", "bandSkip", "Skip This Job starts at", 75, "score", 3, 100),
+
+    P("Posting age", "age3", "Posted 0–3 days ago", -8, "pts", ...PTS),
+    P("Posting age", "age7", "Posted 4–7 days ago", -4, "pts", ...PTS),
+    P("Posting age", "age14", "Posted 8–14 days ago", 0, "pts", ...PTS),
+    P("Posting age", "age30", "Posted 15–30 days ago", 8, "pts", ...PTS),
+    P("Posting age", "age60", "Posted 31–60 days ago", 18, "pts", ...PTS),
+    P("Posting age", "age90", "Posted 61–90 days ago", 26, "pts", ...PTS),
+    P("Posting age", "ageOld", "Posted over 90 days ago", 32, "pts", ...PTS),
+    P("Posting age", "floor60", "Minimum score at 60+ days old", 40, "score", 0, 100),
+    P("Posting age", "floor90", "Minimum score at 90+ days old", 55, "score", 0, 100),
+    P("Posting age", "floor120", "Minimum score at 120+ days old", 75, "score", 0, 100),
+    P("Posting age", "floorTurnover120", "Minimum score at 120+ days old, high-turnover roles", 40, "score", 0, 100),
+
+    P("Reposts and applications", "reposted", "Marked as reposted", 14, "pts", ...PTS),
+    P("Reposts and applications", "recycled", "Recycled listing, per matching listing you've seen", 7, "pts", ...PTS),
+    P("Reposts and applications", "recycledMax", "Recycled listing, most it can add", 14, "pts", 0, 100),
+    P("Reposts and applications", "applicants", "Heavy applicant volume on an old listing", 8, "pts", ...PTS),
+    P("Reposts and applications", "applicantsMin", "Heavy volume means at least", 100, "applicants", 1, 100000),
+    P("Reposts and applications", "applicantsDays", "Old listing (for applicant volume) means at least", 21, "days", 0, 365),
+    P("Reposts and applications", "easyApplyOld", "Easy Apply on an old listing", 5, "pts", ...PTS),
+    P("Reposts and applications", "easyApplyDays", "Old listing (for Easy Apply) means at least", 30, "days", 0, 365),
+
+    P("Salary and who's posting", "salaryListed", "Salary listed", -6, "pts", ...PTS),
+    P("Salary and who's posting", "salaryMissing", "No salary listed", 6, "pts", ...PTS),
+    P("Salary and who's posting", "agency", "Staffing agency or job board", 12, "pts", ...PTS),
+    P("Salary and who's posting", "offsite", "Apply sends you to another site", 4, "pts", ...PTS),
+
+    P("Description", "descVeryShort", "Very short description", 12, "pts", ...PTS),
+    P("Description", "descShort", "Short description", 5, "pts", ...PTS),
+    P("Description", "descVeryShortLen", "Very short means under", 400, "characters", 0, 20000),
+    P("Description", "descShortLen", "Short means under", 900, "characters", 0, 20000),
+    P("Description", "descVeryShortLenStructured", "Very short means under (Job Bank bullet-point postings)", 150, "characters", 0, 20000),
+    P("Description", "descShortLenStructured", "Short means under (Job Bank bullet-point postings)", 350, "characters", 0, 20000),
+    P("Description", "placeholder", "Template placeholder left in", 15, "pts", ...PTS),
+    P("Description", "vague", "Vague, generic wording", 6, "pts", ...PTS),
+    P("Description", "vagueMin", "Vague means at least", 4, "phrases", 1, 30),
+    P("Description", "seniority", "Junior title asking for senior experience", 10, "pts", ...PTS),
+    P("Description", "seniorityYears", "Senior experience means at least", 5, "years", 1, 30),
+    P("Description", "workplace", "Remote vs. on-site contradiction", 6, "pts", ...PTS),
+
+    P("Employer", "hiringContact", "Hiring contact shown", -6, "pts", ...PTS),
+    P("Employer", "responsive", "Responsive employer", -6, "pts", ...PTS),
+    P("Employer", "activelyReviewing", "Actively reviewing applicants", -6, "pts", ...PTS),
+    P("Employer", "urgent", "Urgently hiring", -2, "pts", ...PTS),
+    P("Employer", "employerActive", "Employer recently active", -4, "pts", ...PTS),
+    P("Employer", "employerActiveDays", "Recently active means within", 3, "days", 0, 365),
+    P("Employer", "employerInactive", "Employer inactive", 8, "pts", ...PTS),
+    P("Employer", "employerInactiveDays", "Inactive means not active for", 30, "days", 1, 365),
+    P("Employer", "lowRating", "Low company rating", 6, "pts", ...PTS),
+    P("Employer", "lowRatingBelow", "Low rating means below", 3.0, "stars", 0, 5, 0.1),
+    P("Employer", "goodRating", "Good company rating", -3, "pts", ...PTS),
+    P("Employer", "goodRatingFrom", "Good rating means at least", 4.0, "stars", 0, 5, 0.1),
+
+    P("Your history and reports", "historyMin", "Blend in employer history after", 2, "other listings", 1, 100),
+    P("Your history and reports", "historyMaxWeight", "Employer history weight, at 10+ listings", 50, "%", 0, 100),
+    P("Your history and reports", "historyDownPct", "Strength when history would lower a score", 33, "%", 0, 100),
+    P("Your history and reports", "reportGhost", "Per ghost flag you've given the employer", 6, "pts", ...PTS),
+    P("Your history and reports", "reportGhostMax", "Ghost flags, most they can add", 18, "pts", 0, 100),
+    P("Your history and reports", "reportNoResp", "Per never-heard-back or ghosted outcome", 4, "pts", ...PTS),
+    P("Your history and reports", "reportNoRespMax", "Those outcomes, most they can add", 12, "pts", 0, 100),
+    P("Your history and reports", "reportPositive", "Per interview or offer outcome", -4, "pts", ...PTS),
+    P("Your history and reports", "reportPositiveMax", "Interviews and offers, most they can lower", 8, "pts", 0, 100),
   ];
+  const DEFAULTS = Object.fromEntries(PARAMS.map((p) => [p.key, p.def]));
+
+  /** Defaults with valid saved changes applied (out-of-range values are clamped). */
+  function weightsFrom(saved) {
+    const w = Object.assign({}, DEFAULTS);
+    if (saved && typeof saved === "object") {
+      for (const p of PARAMS) {
+        const v = Number(saved[p.key]);
+        if (saved[p.key] === null || saved[p.key] === "" || !Number.isFinite(v)) continue;
+        w[p.key] = Math.min(p.max, Math.max(p.min, v));
+      }
+    }
+    // Bands must go up in order.
+    w.bandWaste = Math.max(w.bandWaste, w.bandCaution + 1);
+    w.bandSkip = Math.min(100, Math.max(w.bandSkip, w.bandWaste + 1));
+    return w;
+  }
+
+  const BAND_STYLE = [
+    { key: "apply", label: "Worth Applying", color: "#1f9d55" },
+    { key: "caution", label: "Proceed with Caution", color: "#d69e2e" },
+    { key: "waste", label: "Likely a Waste of Time", color: "#dd6b20" },
+    { key: "skip", label: "Skip This Job", color: "#c53030" },
+  ];
+
+  /** The four bands, each with `max` (highest score in it), for the given saved weights. */
+  function bandsFor(saved) {
+    const w = weightsFrom(saved);
+    const maxes = [w.bandCaution - 1, w.bandWaste - 1, w.bandSkip - 1, 100];
+    return BAND_STYLE.map((b, i) => Object.assign({ max: maxes[i] }, b));
+  }
+
+  const BANDS = bandsFor(null);
 
   const HIGH_TURNOVER_RE = new RegExp(
     [
@@ -75,8 +175,9 @@
     /(\b(entry[- ]level|junior|jr|new grad|graduate|intern|trainee|apprentice|level 1)\b|\s(I|1)$)/i;
   const SENIOR_REQ_RE = /\b(\d{1,2})\s*\+?\s*(?:-\s*\d{1,2}\s*)?(?:years|yrs)\b[^.]{0,40}\b(experience|exp)\b/gi;
 
-  function bandFor(score) {
-    return BANDS.find((b) => score <= b.max) || BANDS[BANDS.length - 1];
+  function bandFor(score, saved) {
+    const bands = saved ? bandsFor(saved) : BANDS;
+    return bands.find((b) => score <= b.max) || bands[bands.length - 1];
   }
 
   function normalize(str) {
@@ -121,8 +222,9 @@
 
     const title = L.title || "";
     const desc = typeof L.description === "string" ? L.description : null;
+    const W = weightsFrom(ctx.weights);
     const highTurnover = HIGH_TURNOVER_RE.test(title);
-    const turnoverMult = highTurnover ? 0.5 : 1;
+    const turnoverMult = highTurnover ? W.turnoverPct / 100 : 1;
     let floor = 0;
 
     if (highTurnover) {
@@ -133,22 +235,22 @@
     if (isKnown(L.ageDays)) {
       const d = L.ageDays;
       let pts;
-      if (d <= 3) pts = -8;
-      else if (d <= 7) pts = -4;
-      else if (d <= 14) pts = 0;
-      else if (d <= 30) pts = 8;
-      else if (d <= 60) pts = 18;
-      else if (d <= 90) pts = 26;
-      else pts = 32;
+      if (d <= 3) pts = W.age3;
+      else if (d <= 7) pts = W.age7;
+      else if (d <= 14) pts = W.age14;
+      else if (d <= 30) pts = W.age30;
+      else if (d <= 60) pts = W.age60;
+      else if (d <= 90) pts = W.age90;
+      else pts = W.ageOld;
       pts = pts > 0 ? Math.round(pts * turnoverMult) : pts;
       add("age", "Posting age", `Posted ${fmtAge(d)}${L.ageApprox ? " (approximate)" : ""}.`, pts);
 
       if (!highTurnover) {
-        if (d >= 120) floor = Math.max(floor, 75);
-        else if (d >= 90) floor = Math.max(floor, 55);
-        else if (d >= 60) floor = Math.max(floor, 40);
+        if (d >= 120) floor = Math.max(floor, W.floor120);
+        else if (d >= 90) floor = Math.max(floor, W.floor90);
+        else if (d >= 60) floor = Math.max(floor, W.floor60);
       } else if (d >= 120) {
-        floor = Math.max(floor, 40);
+        floor = Math.max(floor, W.floorTurnover120);
       }
     } else {
       unknown("Posting age");
@@ -156,7 +258,7 @@
 
     // --- Reposts -------------------------------------------------------------
     if (L.reposted === true) {
-      add("repost", "Reposted listing", "The platform marks this listing as reposted.", Math.round(14 * turnoverMult));
+      add("repost", "Reposted listing", "The platform marks this listing as reposted.", Math.round(W.reposted * (W.reposted > 0 ? turnoverMult : 1)));
     }
     const hist = ctx.history;
     if (hist && Array.isArray(hist.listings) && L.title) {
@@ -168,7 +270,7 @@
           .map((x) => x.id)
       );
       if (dupes.size > 0) {
-        const pts = Math.round(Math.min(14, dupes.size * 7) * turnoverMult);
+        const pts = Math.round(Math.min(W.recycledMax, dupes.size * W.recycled) * turnoverMult);
         add(
           "recycled",
           "Recycled listing",
@@ -180,21 +282,21 @@
 
     // --- Applicant volume / Easy Apply on old listings -------------------------
     if (isKnown(L.applicants)) {
-      if (L.applicants >= 100 && isKnown(L.ageDays) && L.ageDays >= 21) {
-        add("applicants", "Heavy applicant volume", `${L.applicantsText || L.applicants + "+ applicants"} on a listing that's still open after ${Math.round(L.ageDays)} days.`, 8);
-      } else if (L.applicants >= 100) {
+      if (L.applicants >= W.applicantsMin && isKnown(L.ageDays) && L.ageDays >= W.applicantsDays) {
+        add("applicants", "Heavy applicant volume", `${L.applicantsText || L.applicants + "+ applicants"} on a listing that's still open after ${Math.round(L.ageDays)} days.`, W.applicants);
+      } else if (L.applicants >= W.applicantsMin) {
         add("applicants", "Applicant volume", L.applicantsText || `${L.applicants}+ applicants`, 0);
       }
     }
-    if (L.easyApply === true && isKnown(L.ageDays) && L.ageDays >= 30) {
-      add("easyapply-old", "Easy Apply on an old listing", "One-click applications on a month-old posting often pile up unread.", 5);
+    if (L.easyApply === true && isKnown(L.ageDays) && L.ageDays >= W.easyApplyDays) {
+      add("easyapply-old", "Easy Apply on an old listing", `One-click applications on a posting this old (${Math.round(L.ageDays)} days) often pile up unread.`, W.easyApplyOld);
     }
 
     // --- Salary ------------------------------------------------------------
     if (L.salaryListed === true) {
-      add("salary", "Salary listed", L.salaryText ? L.salaryText : "Pay range is disclosed.", -6);
+      add("salary", "Salary listed", L.salaryText ? L.salaryText : "Pay range is disclosed.", W.salaryListed);
     } else if (L.salaryListed === false) {
-      add("salary", "No salary listed", "No pay information on the listing.", 6);
+      add("salary", "No salary listed", "No pay information on the listing.", W.salaryMissing);
     } else {
       unknown("Salary");
     }
@@ -207,7 +309,7 @@
         "agency",
         "Posted by a staffing agency or job board",
         agencyByDesc ? "The description says it is hiring for a client." : `"${L.company}" looks like a recruiter or aggregator.`,
-        12
+        W.agency
       );
     }
 
@@ -216,19 +318,21 @@
       const text = desc.replace(/\s+/g, " ").trim();
       const len = text.length;
       // Structured postings (Job Bank's bullet lists) are naturally terser than free text.
-      const [veryShort, short] = L.descStructured ? [150, 350] : [400, 900];
-      if (len < veryShort) add("desc-short", "Very short description", `Only ${len} characters.`, 12);
-      else if (len < short) add("desc-short", "Short description", `${len} characters.`, 5);
+      const [veryShort, short] = L.descStructured
+        ? [W.descVeryShortLenStructured, W.descShortLenStructured]
+        : [W.descVeryShortLen, W.descShortLen];
+      if (len < veryShort) add("desc-short", "Very short description", `Only ${len} characters.`, W.descVeryShort);
+      else if (len < short) add("desc-short", "Short description", `${len} characters.`, W.descShort);
 
       if (PLACEHOLDER_RE.test(text)) {
         const m = text.match(PLACEHOLDER_RE);
-        add("placeholder", "Template placeholder left in", `Found "${m[0].slice(0, 40)}".`, 15);
+        add("placeholder", "Template placeholder left in", `Found "${m[0].slice(0, 40)}".`, W.placeholder);
       }
 
       const lower = text.toLowerCase();
       const vague = VAGUE_PHRASES.filter((p) => lower.includes(p));
-      if (vague.length >= 4) {
-        add("vague", "Vague, generic wording", `Phrases like "${vague.slice(0, 3).join('", "')}".`, 6);
+      if (vague.length >= W.vagueMin) {
+        add("vague", "Vague, generic wording", `Phrases like "${vague.slice(0, 3).join('", "')}".`, W.vague);
       }
 
       // Seniority mismatch
@@ -237,42 +341,42 @@
         let m;
         SENIOR_REQ_RE.lastIndex = 0;
         while ((m = SENIOR_REQ_RE.exec(text))) maxYears = Math.max(maxYears, parseInt(m[1], 10));
-        if (maxYears >= 5 || /\bsenior[- ]level\b/i.test(text)) {
-          add("seniority", "Seniority mismatch", `Junior-sounding title but asks for ${maxYears >= 5 ? maxYears + "+ years" : "senior-level"} experience.`, 10);
+        if (maxYears >= W.seniorityYears || /\bsenior[- ]level\b/i.test(text)) {
+          add("seniority", "Seniority mismatch", `Junior-sounding title but asks for ${maxYears >= W.seniorityYears ? maxYears + "+ years" : "senior-level"} experience.`, W.seniority);
         }
       }
 
       // Work arrangement contradiction
       if (L.workplace === "remote" && /\b(on[- ]site|in[- ]office|in the office)\b[^.]{0,40}\b(\d|five|four|required|daily|days)\b|\bmust (live|reside) within\b|\bcommuting distance\b|\brelocat(e|ion) (to|is) required\b/i.test(text)) {
-        add("workplace", "Remote vs. on-site contradiction", "Listed as remote, but the description asks for office presence.", 6);
+        add("workplace", "Remote vs. on-site contradiction", "Listed as remote, but the description asks for office presence.", W.workplace);
       } else if (L.workplace === "onsite" && /\b(100%|fully|completely) remote\b/i.test(text)) {
-        add("workplace", "On-site vs. remote contradiction", "Listed as on-site, but the description says fully remote.", 6);
+        add("workplace", "On-site vs. remote contradiction", "Listed as on-site, but the description says fully remote.", W.workplace);
       }
     } else if (!L.preview) {
       unknown("Description");
     }
 
     // --- Contact / responsiveness -------------------------------------------------
-    if (L.hiringContact === true) add("contact", "Hiring contact shown", "A named recruiter or hiring manager is attached.", -6);
-    if (L.responsiveEmployer === true) add("responsive", "Responsive employer", L.responsiveText || "The platform reports this employer responds to applicants.", -6);
+    if (L.hiringContact === true) add("contact", "Hiring contact shown", "A named recruiter or hiring manager is attached.", W.hiringContact);
+    if (L.responsiveEmployer === true) add("responsive", "Responsive employer", L.responsiveText || "The platform reports this employer responds to applicants.", W.responsive);
     if (isKnown(L.employerActiveDays)) {
       const d = L.employerActiveDays;
-      if (d <= 3) add("employer-active", "Employer recently active", `Employer active ${fmtAge(d)}.`, -4);
-      else if (d >= 30) add("employer-active", "Employer inactive", `Employer last active ${fmtAge(d)}.`, 8);
+      if (d <= W.employerActiveDays) add("employer-active", "Employer recently active", `Employer active ${fmtAge(d)}.`, W.employerActive);
+      else if (d >= W.employerInactiveDays) add("employer-active", "Employer inactive", `Employer last active ${fmtAge(d)}.`, W.employerInactive);
     }
 
     // --- Engagement ---------------------------------------------------------------
-    if (L.activelyReviewing === true) add("engagement", "Actively reviewing applicants", "The platform says the employer is actively reviewing.", -6);
-    if (L.urgentlyHiring === true) add("urgent", "Urgently hiring", "Marked as urgently hiring.", -2);
+    if (L.activelyReviewing === true) add("engagement", "Actively reviewing applicants", "The platform says the employer is actively reviewing.", W.activelyReviewing);
+    if (L.urgentlyHiring === true) add("urgent", "Urgently hiring", "Marked as urgently hiring.", W.urgent);
 
     // --- Off-platform apply ------------------------------------------------------
-    if (L.externalApply === true) add("offsite", "Apply redirects off-platform", "You'll be sent to an external site to apply.", 4);
+    if (L.externalApply === true) add("offsite", "Apply redirects off-platform", "You'll be sent to an external site to apply.", W.offsite);
 
     // --- Company rating (Indeed) ---------------------------------------------------
     if (isKnown(L.companyRating)) {
       const where = `${L.companyRating.toFixed(1)} / 5 on ${L.ratingSource || "Indeed"}.`;
-      if (L.companyRating < 3.0) add("rating", "Low company rating", where, 6);
-      else if (L.companyRating >= 4.0) add("rating", "Good company rating", where, -3);
+      if (L.companyRating < W.lowRatingBelow) add("rating", "Low company rating", where, W.lowRating);
+      else if (L.companyRating >= W.goodRatingFrom) add("rating", "Good company rating", where, W.goodRating);
       else add("rating", "Company rating", where, 0);
     }
 
@@ -284,7 +388,7 @@
     if (L.closed === true) add("closed", "No longer accepting applications", "This listing is closed.", 0);
 
     // --- Raw listing score ------------------------------------------------------
-    let raw = BASE + signals.reduce((s, x) => s + x.points, 0);
+    let raw = W.base + signals.reduce((s, x) => s + x.points, 0);
     raw = Math.max(0, Math.min(100, raw));
     if (raw < floor) {
       add("floor", "Age floor applied", `Listings this old score at least ${floor}.`, floor - raw);
@@ -295,11 +399,13 @@
     let final = raw;
     if (hist && Array.isArray(hist.listings)) {
       const others = hist.listings.filter((x) => x.id !== L.id && typeof x.score === "number");
-      if (others.length >= 2) {
+      if (others.length >= W.historyMin) {
         const avg = others.reduce((s, x) => s + x.score, 0) / others.length;
-        const weight = Math.min(others.length, 10) / 20; // thin records weigh little (max 0.5)
+        // Thin records weigh little; full weight from 10 listings.
+        const weight = (Math.min(others.length, 10) / 10) * (W.historyMaxWeight / 100);
         let delta = (avg - raw) * weight;
-        if (delta < 0) delta /= 3; // history raises more easily than it lowers
+        // History raises more easily than it lowers (default: a third of the strength).
+        if (delta < 0) delta *= W.historyDownPct === 33 ? 1 / 3 : W.historyDownPct / 100;
         delta = Math.round(delta);
         if (delta !== 0) {
           add(
@@ -319,7 +425,11 @@
     const noResp = f.noResponse || 0;
     const positive = f.positive || 0;
     if (ghost || noResp || positive) {
-      const delta = Math.min(18, ghost * 6) + Math.min(12, noResp * 4) - Math.min(8, positive * 4);
+      const capped = (n, per, cap) => Math.max(-cap, Math.min(cap, n * per));
+      const delta =
+        capped(ghost, W.reportGhost, W.reportGhostMax) +
+        capped(noResp, W.reportNoResp, W.reportNoRespMax) +
+        capped(positive, W.reportPositive, W.reportPositiveMax);
       if (delta !== 0) {
         const parts = [];
         if (ghost) parts.push(`${ghost} ghost flag${ghost === 1 ? "" : "s"}`);
@@ -335,12 +445,12 @@
 
     return {
       score: final,
-      band: bandFor(final),
+      band: bandFor(final, ctx.weights),
       signals,
       unknowns,
       highTurnover,
     };
   }
 
-  globalThis.GJScoring = { score, bandFor, BANDS, normalize, employerKey };
+  globalThis.GJScoring = { score, bandFor, bandsFor, weightsFrom, BANDS, PARAMS, DEFAULTS, normalize, employerKey };
 })();

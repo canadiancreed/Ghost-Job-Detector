@@ -1,0 +1,12 @@
+# Not needed to install the extension. The extension itself is
+# manifest.json, icons/, src/, popup/ and options/ (plus README.md).
+
+# Built packages
+dist/
+
+# Development: build script and test pages
+build.ps1
+test/
+
+# Claude Code session settings
+.claude/

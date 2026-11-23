@@ -13,6 +13,7 @@
     toolbarBadge: true,
     cardPlacement: "inline", // "inline" | "floating"
     startCollapsed: false,
+    weights: {}, // scoring values you've changed: { key: value } (see GJScoring.PARAMS)
   };
 
   // Storage layout (browser.storage.local):

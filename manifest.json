@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Ghost Job Detector",
   "short_name": "Ghost Jobs",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Scores job listings on LinkedIn, Indeed, Monster and Job Bank 0–100 for ghost-job risk. Everything runs locally.",
   "icons": {
     "48": "icons/icon.svg",

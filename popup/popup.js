@@ -30,11 +30,13 @@ function show(...nodes) {
   main.replaceChildren(...nodes);
 }
 
+let bands = globalThis.GJScoring.BANDS; // replaced with your own band cutoffs in render()
+
 function legend() {
   return h(
     "div",
     { class: "legend" },
-    globalThis.GJScoring.BANDS.flatMap((b, i, arr) => [
+    bands.flatMap((b, i, arr) => [
       h("b", { style: `color:${b.color}` }, `${i === 0 ? 0 : arr[i - 1].max + 1}–${b.max}`),
       h("span", null, b.label),
     ])
@@ -42,6 +44,10 @@ function legend() {
 }
 
 async function render() {
+  try {
+    const { settings } = await browser.storage.local.get("settings");
+    bands = globalThis.GJScoring.bandsFor(settings && settings.weights);
+  } catch (_) {}
   const granted = await browser.permissions.contains({ origins: ORIGINS });
   if (!granted) {
     show(
