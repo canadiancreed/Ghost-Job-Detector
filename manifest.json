@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Ghost Job Detector",
+  "short_name": "Ghost Jobs",
+  "version": "1.0.0",
+  "description": "Scores job listings on LinkedIn, Indeed, Monster and Job Bank 0–100 for ghost-job risk. Everything runs locally.",
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ghost-job-detector@local",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "*://*.linkedin.com/*",
+    "*://*.indeed.com/*",
+    "*://*.monster.com/*",
+    "*://*.monster.ca/*",
+    "*://*.jobbank.gc.ca/*"
+  ],
+  "background": {
+    "scripts": ["src/background.js"]
+  },
+  "action": {
+    "default_title": "Ghost Job Detector",
+    "default_popup": "popup/popup.html",
+    "default_icon": "icons/icon.svg"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.linkedin.com/*",
+        "*://*.indeed.com/*",
+        "*://*.monster.com/*",
+        "*://*.monster.ca/*",
+        "*://*.jobbank.gc.ca/*"
+      ],
+      "js": [
+        "src/scoring.js",
+        "src/storage.js",
+        "src/extractors/common.js",
+        "src/extractors/linkedin.js",
+        "src/extractors/indeed.js",
+        "src/extractors/monster.js",
+        "src/extractors/jobbank.js",
+        "src/ui.js",
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

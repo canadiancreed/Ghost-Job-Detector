@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ghost Job Detector Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>👻 Ghost Job Detector</h1>
+    <p class="muted">Scores LinkedIn, Indeed, Monster and Job Bank listings for ghost-job risk. Everything is computed and stored in this browser; nothing is sent anywhere.</p>
+
+    <section>
+      <h2>Display</h2>
+      <label><input type="checkbox" id="showCard"> Show the Ghost Risk card on job listings</label>
+      <label><input type="checkbox" id="toolbarBadge"> Show the score on the toolbar icon</label>
+      <label><input type="checkbox" id="startCollapsed"> Start the card collapsed</label>
+      <label class="select">Card placement
+        <select id="cardPlacement">
+          <option value="inline">Inline, under the job header</option>
+          <option value="floating">Floating, bottom-right corner</option>
+        </select>
+      </label>
+      <p id="saved" class="muted" aria-live="polite"></p>
+    </section>
+
+    <section>
+      <h2>Site access</h2>
+      <p id="perm" class="muted">Checking…</p>
+      <button id="grant" hidden>Grant access to the job sites</button>
+    </section>
+
+    <section>
+      <h2>Your data</h2>
+      <p class="muted" id="stats">…</p>
+      <div class="row">
+        <button id="export">Export JSON</button>
+        <label class="button">Import JSON<input type="file" id="import" accept="application/json" hidden></label>
+        <button id="clearHistory">Clear employer history</button>
+        <button id="clearReports" class="danger">Clear your reports</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>How scoring works</h2>
+      <p>Each listing starts at 20 and moves up or down based on signals the page shows. Information the page doesn't show is listed as unknown and never counted against the listing.</p>
+      <ul class="bands">
+        <li><b class="b1">0–34</b> Worth Applying</li>
+        <li><b class="b2">35–54</b> Proceed with Caution</li>
+        <li><b class="b3">55–74</b> Likely a Waste of Time</li>
+        <li><b class="b4">75–100</b> Skip This Job</li>
+      </ul>
+      <p>Signals: posting age (with minimum scores at 60, 90 and 120 days), reposts and recycled listings you've seen before, applicant volume and Easy Apply on old listings, salary disclosure, staffing agencies and job boards, description length, vague wording and leftover template placeholders, junior titles with senior requirements, hiring contacts, employer responsiveness and activity, "actively reviewing" indicators, off-platform apply, company ratings (Indeed), and remote vs. on-site contradictions.</p>
+      <p>Your history with an employer (the average score of its other listings you've opened) and your own flags and outcome reports are blended in. Thin history counts for little, and history raises a score more easily than it lowers it. High-turnover roles such as baristas, warehouse staff and nursing assistants are scored more leniently on age and reposts.</p>
+      <p class="muted">Scores are estimates, not verdicts.</p>
+    </section>
+  </main>
+  <script src="../src/scoring.js"></script>
+  <script src="../src/storage.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
